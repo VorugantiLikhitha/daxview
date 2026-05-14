@@ -109,6 +109,18 @@ st.markdown("""
 
 h1, h2, h3 { color: #0f172a !important; }
 p, li { color: #475569; }
+
+/* Sector filter dropdown */
+[data-testid="stSelectbox"] > div > div {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1.5px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+}
+[data-testid="stSelectbox"] svg { color: #0f172a !important; fill: #0f172a !important; }
+[data-testid="stSelectbox"] span { color: #0f172a !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -147,8 +159,8 @@ with nav_col4:
         st.session_state.page = "ai"
         st.rerun()
 with nav_col5:
-    active = {"overview":"🏠 Overview","forecasts":"📈 Forecasts","ai":"🤖 AI Analyst"}
-    st.markdown(f"<div style='text-align:right; color:#64748b; font-size:13px; padding-top:8px;'>Current: <strong>{active.get(st.session_state.page,'Overview')}</strong></div>", unsafe_allow_html=True)
+    sectors = ["All Sectors", "Healthcare", "Pharma", "Chemical", "Industrial"]
+    selected_sector = st.selectbox("", sectors, label_visibility="collapsed", key="sector_filter")
 
 # ── Data ──────────────────────────────────────────────────────────────────────
 @st.cache_data
@@ -156,7 +168,32 @@ def load_data():
     p = Path("data/processed/demand_clean.csv")
     return pd.read_csv(p, parse_dates=["Date"]) if p.exists() else pd.DataFrame()
 
-df = load_data()
+def assign_sector(df):
+    """Map product categories to sectors based on category number ranges."""
+    if df.empty:
+        return df
+    df = df.copy()
+    def get_sector(cat):
+        try:
+            n = int(str(cat).replace("Category_","").strip())
+            if n <= 10:   return "Healthcare"
+            elif n <= 20: return "Pharma"
+            elif n <= 30: return "Chemical"
+            else:         return "Industrial"
+        except:
+            return "Industrial"
+    df["Sector"] = df["Product_Category"].apply(get_sector)
+    return df
+
+df_raw = load_data()
+df_raw = assign_sector(df_raw)
+
+# Apply sector filter
+_sector = st.session_state.get("sector_filter", "All Sectors")
+if _sector and _sector != "All Sectors":
+    df = df_raw[df_raw["Sector"] == _sector].copy()
+else:
+    df = df_raw.copy()
 
 # ── RAG ───────────────────────────────────────────────────────────────────────
 @st.cache_resource
@@ -166,8 +203,12 @@ def get_rag():
 
 # ── PAGE: OVERVIEW ────────────────────────────────────────────────────────────
 if st.session_state.page == "overview":
-    st.markdown("<div class='page-title'>Demand Overview</div>", unsafe_allow_html=True)
-    st.markdown("<div class='page-sub'>Single-use disposables · Healthcare · Food Service · Industrial</div>", unsafe_allow_html=True)
+    sector = st.session_state.get("sector_filter", "All Sectors")
+    sector_colors = {"Healthcare":"#eff6ff","Pharma":"#f0fdf4","Chemical":"#fef9c3","Industrial":"#fdf4ff","All Sectors":"#f1f5f9"}
+    sector_icons  = {"Healthcare":"🏥","Pharma":"💊","Chemical":"⚗️","Industrial":"🏭","All Sectors":"🌐"}
+    badge = f"<span style='background:{sector_colors.get(sector,'#f1f5f9')};border-radius:20px;padding:3px 12px;font-size:12px;font-weight:600;color:#0f172a;margin-left:10px;'>{sector_icons.get(sector,'')} {sector}</span>" if sector != "All Sectors" else ""
+    st.markdown(f"<div class='page-title'>Demand Overview {badge}</div>", unsafe_allow_html=True)
+    st.markdown("<div class='page-sub'>Single-use disposables · Healthcare · Pharma · Chemical · Industrial</div>", unsafe_allow_html=True)
 
     if df.empty:
         st.info("Run `python 01_eda.py` first to generate processed data.")
