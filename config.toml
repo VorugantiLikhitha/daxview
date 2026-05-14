@@ -1,0 +1,13 @@
+[ui]
+hideTopBar = true
+
+[client]
+showSidebarNavigation = false
+
+[theme]
+base = "light"
+primaryColor = "#0f172a"
+backgroundColor = "#f1f5f9"
+secondaryBackgroundColor = "#0f172a"
+textColor = "#1e293b"
+font = "sans serif"
